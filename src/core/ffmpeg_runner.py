@@ -113,7 +113,7 @@ def run_ffmpeg(
     """
     ffmpeg = get_ffmpeg_path()
     if not os.path.isfile(ffmpeg):
-        raise FileNotFoundError(f"FFmpeg não encontrado em: {ffmpeg}")
+        raise FileNotFoundError(f"FFmpeg tidak ditemukan di: {ffmpeg}")
 
     audio_duration = pair.duration_audio or 0.0
 
@@ -126,7 +126,7 @@ def run_ffmpeg(
         _log(f"[{label}] Memulai proses...")
         proc = subprocess.Popen(
             cmd,
-            stdout=subprocess.PIPE,
+            stdout=subprocess.DEVNULL,
             stderr=subprocess.PIPE,
             text=True,
             encoding="utf-8",
@@ -171,10 +171,20 @@ def run_ffmpeg(
         stderr_text = "\n".join(stderr_lines)
         return proc.returncode == 0, "", stderr_text
 
+    def _cleanup_output():
+        try:
+            if os.path.exists(output_path):
+                os.remove(output_path)
+        except Exception:
+            pass
+
     # ── Attempt 1: Stream copy (unless always_reencode) ──────────────────────
     if not always_reencode:
         cmd_copy = build_command_stream_copy(ffmpeg, pair, output_path)
         ok, _, stderr = _run(cmd_copy, "Stream Copy")
+        if cancelled_flag and cancelled_flag():
+            _cleanup_output()
+            return False, "cancelled"
         if ok:
             _log("[Stream Copy] ✅ Selesai.")
             return True, "stream_copy"
@@ -183,6 +193,7 @@ def run_ffmpeg(
                 _log("[Stream Copy] ⚠️ Codec tidak kompatibel — fallback ke re-encode...")
             else:
                 # Real error (file not found, corrupt, etc.) — don't fallback
+                _cleanup_output()
                 _log(f"[Stream Copy] ❌ Gagal: {_extract_error(stderr)}")
                 return False, "stream_copy"
 
@@ -190,6 +201,10 @@ def run_ffmpeg(
     encoder_label = encoder_mode.value.upper()
     cmd_reencode = build_command_reencode(ffmpeg, pair, output_path, encoder_mode, hw_info)
     ok, _, stderr = _run(cmd_reencode, f"Re-encode ({encoder_label})")
+
+    if cancelled_flag and cancelled_flag():
+        _cleanup_output()
+        return False, "cancelled"
 
     if ok:
         _log(f"[Re-encode] ✅ Selesai (encoder: {encoder_label}).")
@@ -202,10 +217,14 @@ def run_ffmpeg(
             _log("[Re-encode] ⚠️ NVENC gagal — fallback ke CPU (x264)...")
             cmd_cpu = build_command_reencode(ffmpeg, pair, output_path, EncoderMode.CPU, hw_info)
             ok, _, stderr = _run(cmd_cpu, "Re-encode (CPU Fallback)")
+            if cancelled_flag and cancelled_flag():
+                _cleanup_output()
+                return False, "cancelled"
             if ok:
                 _log("[Re-encode] ✅ Selesai (CPU x264 fallback).")
                 return True, "reencode_CPU_fallback"
 
+    _cleanup_output()
     error_msg = _extract_error(stderr)
     _log(f"[Re-encode] ❌ Gagal: {error_msg}")
     return False, "failed"

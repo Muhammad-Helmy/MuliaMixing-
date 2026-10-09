@@ -19,6 +19,8 @@ from src.pages.single_page import SinglePage
 from src.pages.batch_page import BatchPage
 from src.pages.device_info_page import DeviceInfoPage
 from src.pages.guide_page import GuidePage
+from src.pages.loop_page import LoopPage
+from src.pages.merge_page import MergePage
 from src.widgets.log_panel import LogPanel
 from src.widgets.encoding_selector import EncodingSelector
 from src.utils.path_utils import default_output_folder
@@ -53,6 +55,8 @@ class MainWindow(QMainWindow):
     MODE_BATCH = 1
     MODE_DEVICE = 2
     MODE_GUIDE = 3
+    MODE_LOOP = 4
+    MODE_MERGE = 5
 
     def __init__(self):
         super().__init__()
@@ -144,7 +148,7 @@ class MainWindow(QMainWindow):
         lbl_name = QLabel("MuliaMixing")
         lbl_name.setObjectName("sidebarTitle")
         logo_text_col.addWidget(lbl_name)
-        lbl_sub = QLabel("Video × Audio Merger")
+        lbl_sub = QLabel("Video Toolkit")
         lbl_sub.setObjectName("sidebarSubtitle")
         logo_text_col.addWidget(lbl_sub)
         logo_layout.addLayout(logo_text_col)
@@ -154,12 +158,11 @@ class MainWindow(QMainWindow):
         sidebar_layout.addSpacerItem(QSpacerItem(0, 16))
 
         # Section label
-        nav_label = QLabel("  MENU")
+        nav_label = QLabel("  VIDEO × AUDIO")
         nav_label.setStyleSheet("color: #484F58; font-size: 10px; font-weight: 700; letter-spacing: 1.5px;")
         nav_label.setContentsMargins(16, 0, 0, 8)
         sidebar_layout.addWidget(nav_label)
 
-        # Nav buttons
         nav_btn_layout = QVBoxLayout()
         nav_btn_layout.setContentsMargins(10, 0, 10, 0)
         nav_btn_layout.setSpacing(2)
@@ -171,20 +174,51 @@ class MainWindow(QMainWindow):
         self.navBatch = NavButton("⚡", "Batch Mode")
         self.navBatch.clicked.connect(lambda: self._switch_mode(self.MODE_BATCH))
         nav_btn_layout.addWidget(self.navBatch)
+        sidebar_layout.addLayout(nav_btn_layout)
+        sidebar_layout.addSpacerItem(QSpacerItem(0, 16))
+
+        # Tools group
+        tools_label = QLabel("  VIDEO TOOLS")
+        tools_label.setStyleSheet("color: #484F58; font-size: 10px; font-weight: 700; letter-spacing: 1.5px;")
+        tools_label.setContentsMargins(16, 0, 0, 8)
+        sidebar_layout.addWidget(tools_label)
+
+        tools_layout = QVBoxLayout()
+        tools_layout.setContentsMargins(10, 0, 10, 0)
+        tools_layout.setSpacing(2)
+
+        self.navLoop = NavButton("🔁", "Loop Video")
+        self.navLoop.clicked.connect(lambda: self._switch_mode(self.MODE_LOOP))
+        tools_layout.addWidget(self.navLoop)
+
+        self.navMerge = NavButton("🔗", "Gabung Video")
+        self.navMerge.clicked.connect(lambda: self._switch_mode(self.MODE_MERGE))
+        tools_layout.addWidget(self.navMerge)
+        sidebar_layout.addLayout(tools_layout)
+        sidebar_layout.addSpacerItem(QSpacerItem(0, 16))
+
+        # Other group
+        other_label = QLabel("  LAINNYA")
+        other_label.setStyleSheet("color: #484F58; font-size: 10px; font-weight: 700; letter-spacing: 1.5px;")
+        other_label.setContentsMargins(16, 0, 0, 8)
+        sidebar_layout.addWidget(other_label)
+
+        other_layout = QVBoxLayout()
+        other_layout.setContentsMargins(10, 0, 10, 0)
+        other_layout.setSpacing(2)
 
         self.navDevice = NavButton("💻", "Device Info")
         self.navDevice.clicked.connect(lambda: self._switch_mode(self.MODE_DEVICE))
-        nav_btn_layout.addWidget(self.navDevice)
+        other_layout.addWidget(self.navDevice)
 
         self.navGuide = NavButton("📖", "Panduan")
         self.navGuide.clicked.connect(lambda: self._switch_mode(self.MODE_GUIDE))
-        nav_btn_layout.addWidget(self.navGuide)
-
-        sidebar_layout.addLayout(nav_btn_layout)
+        other_layout.addWidget(self.navGuide)
+        sidebar_layout.addLayout(other_layout)
         sidebar_layout.addStretch()
 
         # Bottom: version label
-        lbl_ver = QLabel("  v1.1.0")
+        lbl_ver = QLabel("  v1.2.0")
         lbl_ver.setObjectName("sidebarVersion")
         lbl_ver.setContentsMargins(16, 0, 0, 16)
         sidebar_layout.addWidget(lbl_ver)
@@ -240,11 +274,24 @@ class MainWindow(QMainWindow):
         self.batchPage = BatchPage(self.exe_dir)
         self.devicePage = DeviceInfoPage()
         self.guidePage = GuidePage()
+        self.loopPage = LoopPage()
+        self.mergePage = MergePage()
 
-        self.stack.addWidget(self.singlePage)   # index 0
-        self.stack.addWidget(self.batchPage)    # index 1
-        self.stack.addWidget(self.devicePage)   # index 2
-        self.stack.addWidget(self.guidePage)    # index 3
+        self._page_for_mode = {
+            self.MODE_SINGLE: self.singlePage,
+            self.MODE_BATCH: self.batchPage,
+            self.MODE_DEVICE: self.devicePage,
+            self.MODE_GUIDE: self.guidePage,
+            self.MODE_LOOP: self.loopPage,
+            self.MODE_MERGE: self.mergePage,
+        }
+
+        self.stack.addWidget(self.singlePage)
+        self.stack.addWidget(self.batchPage)
+        self.stack.addWidget(self.devicePage)
+        self.stack.addWidget(self.guidePage)
+        self.stack.addWidget(self.loopPage)
+        self.stack.addWidget(self.mergePage)
 
         self.devicePage.hw_info_ready.connect(self._on_hw_info_ready)
 
@@ -310,13 +357,15 @@ class MainWindow(QMainWindow):
 
     def _switch_mode(self, mode: int):
         self._current_mode = mode
-        self.stack.setCurrentIndex(mode)
+        self.stack.setCurrentWidget(self._page_for_mode[mode])
 
         page_titles = {
             self.MODE_SINGLE: "Single Mode",
             self.MODE_BATCH:  "Batch Mode",
             self.MODE_DEVICE: "Device Info",
             self.MODE_GUIDE:  "Panduan Penggunaan",
+            self.MODE_LOOP:   "Loop Video",
+            self.MODE_MERGE:  "Gabung Video",
         }
         self.labelPageTitle.setText(page_titles.get(mode, ""))
 
@@ -325,13 +374,20 @@ class MainWindow(QMainWindow):
             self.btnRun.setVisible(False)
         else:
             self.btnRun.setVisible(True)
-            self.btnRun.setText("▶  Run" if mode == self.MODE_SINGLE else "⚡  Run All")
+            if mode == self.MODE_SINGLE:
+                self.btnRun.setText("▶  Run")
+            elif mode == self.MODE_BATCH:
+                self.btnRun.setText("⚡  Run All")
+            else:
+                self.btnRun.setText(f"▶  {self._page_for_mode[mode].run_label}")
 
         # Update nav active states
         self.navSingle.set_active(mode == self.MODE_SINGLE)
         self.navBatch.set_active(mode == self.MODE_BATCH)
         self.navDevice.set_active(mode == self.MODE_DEVICE)
         self.navGuide.set_active(mode == self.MODE_GUIDE)
+        self.navLoop.set_active(mode == self.MODE_LOOP)
+        self.navMerge.set_active(mode == self.MODE_MERGE)
 
     # ─────────────────────────────────────────────────────────────────────────
     # Hardware info
@@ -385,6 +441,56 @@ class MainWindow(QMainWindow):
                 if reply != QMessageBox.Yes:
                     return
             self._start_processing(pairs)
+
+        elif self._current_mode in (self.MODE_LOOP, self.MODE_MERGE):
+            page = self._page_for_mode[self._current_mode]
+            self._start_task_page(page)
+
+    def _start_task_page(self, page):
+        jobs = page.prepare_jobs(self)
+        if not jobs:
+            return
+
+        encoder_mode = self.encodingSelector.get_mode()
+        always_reencode = self.encodingSelector.get_always_reencode()
+
+        if encoder_mode == EncoderMode.NVENC:
+            gpu = self._hw_info.get("gpu") if self._hw_info else None
+            if not gpu or not gpu.get("nvenc_supported"):
+                QMessageBox.critical(
+                    self, "NVENC Tidak Tersedia",
+                    "GPU NVIDIA tidak terdeteksi atau NVENC tidak didukung FFmpeg ini.\n"
+                    "Pilih mode 'Auto' atau 'CPU (x264)'.",
+                )
+                return
+
+        self._batch_total = len(jobs)
+        self._batch_current = 0
+        self._done_count = 0
+
+        self.logPanel.clear()
+        self.logPanel.append_log(
+            f"══════════════════════════════════════════════════════\n"
+            f"  {page.title} — Mulai proses {len(jobs)} item\n"
+            f"  Encoder : {encoder_mode.value.upper()}\n"
+            f"  Mode    : {'Re-encode (paksa)' if always_reencode else 'Stream Copy (cepat, auto-fallback)'}\n"
+            f"══════════════════════════════════════════════════════\n"
+        )
+
+        self.btnRun.setEnabled(False)
+        self.btnCancel.setVisible(True)
+        page.set_running(True)
+        self.labelBatchProgress.setText(f"Menyiapkan {len(jobs)} item...")
+
+        self._worker = page.create_worker(jobs, encoder_mode, always_reencode, self._hw_info, self)
+        if self._worker:
+            self._worker.pair_started.connect(self._on_pair_started)
+            self._worker.pair_progress.connect(self._on_pair_progress)
+            self._worker.pair_done.connect(self._on_pair_done)
+            self._worker.pair_failed.connect(self._on_pair_failed)
+            self._worker.log_message.connect(self.logPanel.append_log)
+            self._worker.batch_finished.connect(self._on_batch_finished)
+            self._worker.start()
 
     def _start_processing(self, pairs: list[MixPair]):
         encoder_mode = self.encodingSelector.get_mode()
@@ -449,8 +555,11 @@ class MainWindow(QMainWindow):
     @Slot(str)
     def _on_pair_started(self, pair_id: str):
         self._batch_current += 1
-        self.batchPage.on_pair_started(pair_id)
-        self.batchPage.update_batch_progress(self._batch_current, self._batch_total)
+        if self._current_mode in (self.MODE_LOOP, self.MODE_MERGE):
+            self._page_for_mode[self._current_mode].on_job_started(pair_id)
+        else:
+            self.batchPage.on_pair_started(pair_id)
+            self.batchPage.update_batch_progress(self._batch_current, self._batch_total)
         self.labelBatchProgress.setText(
             f"⏳  Memproses {self._batch_current} / {self._batch_total}"
         )
@@ -463,11 +572,17 @@ class MainWindow(QMainWindow):
     @Slot(str, str)
     def _on_pair_done(self, pair_id: str, method: str):
         self._done_count += 1
-        self.batchPage.on_pair_done(pair_id, method)
+        if self._current_mode in (self.MODE_LOOP, self.MODE_MERGE):
+            self._page_for_mode[self._current_mode].on_job_done(pair_id, method)
+        else:
+            self.batchPage.on_pair_done(pair_id, method)
 
     @Slot(str, str)
     def _on_pair_failed(self, pair_id: str, error: str):
-        self.batchPage.on_pair_failed(pair_id, error)
+        if self._current_mode in (self.MODE_LOOP, self.MODE_MERGE):
+            self._page_for_mode[self._current_mode].on_job_failed(pair_id, error)
+        else:
+            self.batchPage.on_pair_failed(pair_id, error)
 
     @Slot()
     def _on_batch_finished(self):
@@ -476,6 +591,8 @@ class MainWindow(QMainWindow):
         self.btnCancel.setEnabled(True)
         self.singlePage.set_running(False)
         self.batchPage.set_running(False)
+        self.loopPage.set_running(False)
+        self.mergePage.set_running(False)
         self.logPanel.set_progress_done()
 
         done = self._done_count
@@ -489,11 +606,14 @@ class MainWindow(QMainWindow):
 
         # Offer to open output folder
         if done > 0:
-            output_folder = self.batchPage._output_folder
-            if self._current_mode == self.MODE_SINGLE:
-                pair = self.singlePage.get_pair()
-                if pair.output_folder:
-                    output_folder = pair.output_folder
+            if self._current_mode in (self.MODE_LOOP, self.MODE_MERGE):
+                output_folder = self._page_for_mode[self._current_mode].output_folder()
+            else:
+                output_folder = self.batchPage._output_folder
+                if self._current_mode == self.MODE_SINGLE:
+                    pair = self.singlePage.get_pair()
+                    if pair.output_folder:
+                        output_folder = pair.output_folder
 
             reply = QMessageBox.question(
                 self,
